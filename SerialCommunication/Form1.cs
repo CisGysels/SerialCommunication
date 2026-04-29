@@ -14,9 +14,16 @@ namespace SerialCommunication
 {
     public partial class Form1 : Form
     {
+        private SerialPort serialPortArduino;
+
         public Form1()
         {
             InitializeComponent();
+
+            // Initialize serial port object and set default timeouts (ms)
+            serialPortArduino = new SerialPort();
+            serialPortArduino.ReadTimeout = 1000;
+            serialPortArduino.WriteTimeout = 1000;
         }
 
         private void Form1_Load(object sender, EventArgs e)
@@ -54,7 +61,53 @@ namespace SerialCommunication
 
         private void buttonConnect_Click(object sender, EventArgs e)
         {
-            // abc def ghi jkl
+            try
+            {
+                if (serialPortArduino == null)
+                {
+                    serialPortArduino = new SerialPort();
+                    serialPortArduino.ReadTimeout = 1000;
+                    serialPortArduino.WriteTimeout = 1000;
+                }
+
+                if (!serialPortArduino.IsOpen)
+                {
+                    string port = comboBoxPoort.SelectedItem as string;
+                    if (string.IsNullOrEmpty(port))
+                    {
+                        MessageBox.Show("Selecteer een poort.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        return;
+                    }
+
+                    int baud = 115200;
+                    if (comboBoxBaudrate.SelectedItem != null)
+                    {
+                        int.TryParse(comboBoxBaudrate.SelectedItem.ToString(), out baud);
+                    }
+
+                    serialPortArduino.PortName = port;
+                    serialPortArduino.BaudRate = baud;
+                    // Other properties (parity, databits, stopbits, handshake, etc.) will be set elsewhere in code.
+
+                    serialPortArduino.Open();
+
+                    buttonConnect.Text = "Disconnect";
+                    radioButtonVerbonden.Checked = true;
+                    if (labelStatus != null) labelStatus.Text = "Connected";
+                }
+                else
+                {
+                    serialPortArduino.Close();
+
+                    buttonConnect.Text = "Connect";
+                    radioButtonVerbonden.Checked = false;
+                    if (labelStatus != null) labelStatus.Text = "Disconnected";
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Fout met seriële poort: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
     }
 }
