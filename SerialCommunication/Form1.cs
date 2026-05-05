@@ -246,5 +246,142 @@ namespace SerialCommunication
                 checkBoxDigital4.Checked = false;
             }
         }
+
+        private void trackBarPWM9_Scroll(object sender, EventArgs e)
+        {
+            try
+            {
+                if (!serialPortArduino.IsOpen)
+                {
+                    MessageBox.Show("Seriële verbinding is niet geopend.", "Fout", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                int pwmValue = trackBarPWM9.Value;
+                string command = $"set pwm9 {pwmValue}";
+                serialPortArduino.WriteLine(command);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Fout bij versturen van PWM9 commando: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void trackBarPWM10_Scroll(object sender, EventArgs e)
+        {
+            try
+            {
+                if (!serialPortArduino.IsOpen)
+                {
+                    MessageBox.Show("Seriële verbinding is niet geopend.", "Fout", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                int pwmValue = trackBarPWM10.Value;
+                string command = $"set pwm10 {pwmValue}";
+                serialPortArduino.WriteLine(command);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Fout bij versturen van PWM10 commando: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void trackBarPWM11_Scroll(object sender, EventArgs e)
+        {
+            try
+            {
+                if (!serialPortArduino.IsOpen)
+                {
+                    MessageBox.Show("Seriële verbinding is niet geopend.", "Fout", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                int pwmValue = trackBarPWM11.Value;
+                string command = $"set pwm11 {pwmValue}";
+                serialPortArduino.WriteLine(command);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Fout bij versturen van PWM11 commando: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void tabControl_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            try
+            {
+                if (tabControl.SelectedTab == tabPageOefening3)
+                {
+                    timerOefening3.Enabled = true;
+                }
+                else
+                {
+                    timerOefening3.Enabled = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Fout bij tab selectie: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void timerOefening3_Tick(object sender, EventArgs e)
+        {
+            try
+            {
+                if (!serialPortArduino.IsOpen)
+                {
+                    return;
+                }
+
+                // Verwijder alle voorgaande antwoorden van de Arduino
+                serialPortArduino.ReadExisting();
+
+                // Query digital5
+                serialPortArduino.WriteLine("get d5");
+                string responseD5 = serialPortArduino.ReadLine();
+                if (!string.IsNullOrEmpty(responseD5))
+                {
+                    responseD5 = responseD5.Trim();
+                    // Antwoord formaat: "d5: 0" of "d5: 1"
+                    if (responseD5.Contains(":"))
+                    {
+                        string value = responseD5.Split(':')[1].Trim();
+                        radioButtonDigital5.Checked = (value == "1");
+                    }
+                }
+
+                // Query digital6
+                serialPortArduino.WriteLine("get d6");
+                string responseD6 = serialPortArduino.ReadLine();
+                if (!string.IsNullOrEmpty(responseD6))
+                {
+                    responseD6 = responseD6.Trim();
+                    if (responseD6.Contains(":"))
+                    {
+                        string value = responseD6.Split(':')[1].Trim();
+                        radioButtonDigital6.Checked = (value == "1");
+                    }
+                }
+
+                // Query digital7
+                serialPortArduino.WriteLine("get d7");
+                string responseD7 = serialPortArduino.ReadLine();
+                if (!string.IsNullOrEmpty(responseD7))
+                {
+                    responseD7 = responseD7.Trim();
+                    if (responseD7.Contains(":"))
+                    {
+                        string value = responseD7.Split(':')[1].Trim();
+                        radioButtonDigital7.Checked = (value == "1");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Fout bij lezen van digitale ingangen: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
     }
 }
