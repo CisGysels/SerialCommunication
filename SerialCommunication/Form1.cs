@@ -16,6 +16,7 @@ namespace SerialCommunication
     {
         private SerialPort serialPortArduino;
         private System.Windows.Forms.Timer timerOefening4;
+        private System.Windows.Forms.Timer timerOefening5;
 
         public Form1()
         {
@@ -31,6 +32,11 @@ namespace SerialCommunication
             timerOefening4.Interval = 1000; // 1000 ms
             timerOefening4.Tick += timerOefening4_Tick;
 
+            // Timer for Oefening5 (interval 1000 ms)
+            timerOefening5 = new System.Windows.Forms.Timer();
+            timerOefening5.Interval = 1000; // 1000 ms
+            timerOefening5.Tick += timerOefening5_Tick;
+
             // Wire tab selection to start/stop timer
             tabControl.SelectedIndexChanged += tabControl_SelectedIndexChanged;
 
@@ -38,6 +44,12 @@ namespace SerialCommunication
             if (tabControl.SelectedTab == tabPageOefening4)
             {
                 timerOefening4.Start();
+            }
+
+            // If tabPageOefening5 is already selected at startup, start timer
+            if (tabControl.SelectedTab == tabPageOefening5)
+            {
+                timerOefening5.Start();
             }
         }
 
@@ -345,6 +357,16 @@ namespace SerialCommunication
                 {
                     timerOefening4?.Stop();
                 }
+
+                // timer for Oefening5
+                if (tabControl.SelectedTab == tabPageOefening5)
+                {
+                    timerOefening5?.Start();
+                }
+                else
+                {
+                    timerOefening5?.Stop();
+                }
             }
             catch (Exception ex)
             {
@@ -458,6 +480,116 @@ namespace SerialCommunication
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("Error in timerOefening4_Tick: " + ex.Message);
+            }
+        }
+
+        private void timerOefening5_Tick(object sender, EventArgs e)
+        {
+            try
+            {
+                // Check if serial connection exists
+                if (serialPortArduino == null || !serialPortArduino.IsOpen)
+                {
+                    return;
+                }
+
+                // Remove any previous incoming data
+                try { serialPortArduino.ReadExisting(); } catch { }
+
+                // Read desired temperature from analog pin 0
+                // Range: 0..1023 → 5..45°C
+                // Slope: (45-5)/(1023-0) = 40/1023 ≈ 0.039101
+                // Offset: 5
+                serialPortArduino.WriteLine("get a0");
+                string respA0 = null;
+                try
+                {
+                    respA0 = serialPortArduino.ReadLine();
+                }
+                catch (TimeoutException) { respA0 = null; }
+                catch (Exception) { respA0 = null; }
+
+                double gewensteTemp = 0.0;
+                if (!string.IsNullOrEmpty(respA0))
+                {
+                    string valueA0 = respA0.Trim();
+                    var tokensA0 = valueA0.Split(new char[] { ' ', '\t', ':' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (tokensA0.Length > 0) valueA0 = tokensA0[tokensA0.Length - 1].Trim();
+
+                    if (int.TryParse(valueA0, out int rawA0))
+                    {
+                        // Rescale: 0..1023 → 5..45°C
+                        double slope = 40.0 / 1023.0;  // (45 - 5) / (1023 - 0)
+                        double offset = 5.0;
+                        gewensteTemp = slope * rawA0 + offset;
+                    }
+                }
+
+                // Read current temperature from analog pin 1
+                // Range: 0..1023 → 0..500°C
+                // Slope: (500-0)/(1023-0) = 500/1023 ≈ 0.488563
+                // Offset: 0
+                serialPortArduino.WriteLine("get a1");
+                string respA1 = null;
+                try
+                {
+                    respA1 = serialPortArduino.ReadLine();
+                }
+                catch (TimeoutException) { respA1 = null; }
+                catch (Exception) { respA1 = null; }
+
+                double huidigeTemp = 0.0;
+                if (!string.IsNullOrEmpty(respA1))
+                {
+                    string valueA1 = respA1.Trim();
+                    var tokensA1 = valueA1.Split(new char[] { ' ', '\t', ':' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (tokensA1.Length > 0) valueA1 = tokensA1[tokensA1.Length - 1].Trim();
+
+                    if (int.TryParse(valueA1, out int rawA1))
+                    {
+                        // Rescale: 0..1023 → 0..500°C
+                        double slope = 500.0 / 1023.0;  // (500 - 0) / (1023 - 0)
+                        double offset = 0.0;
+                        huidigeTemp = slope * rawA1 + offset;
+                    }
+                }
+
+                // Update UI with temperature values (rounded to 1 decimal place)
+                string gewensteTempStr = gewensteTemp.ToString("F1") + " °C";
+                string huidige TempStr = huidigeTemp.ToString("F1") + " °C";
+
+                if (labelGewensteTemp.InvokeRequired)
+                {
+                    labelGewensteTemp.BeginInvoke(new Action(() => labelGewensteTemp.Text = gewensteTempStr));
+                }
+                else
+                {
+                    labelGewensteTemp.Text = gewensteTempStr;
+                }
+
+                if (labelHuidigeTemp.InvokeRequired)
+                {
+                    labelHuidigeTemp.BeginInvoke(new Action(() => labelHuidigeTemp.Text = huidge TempStr));
+                }
+                else
+                {
+                    labelHuidigeTemp.Text = huidigeTemp Str;
+                }
+
+                // Control LED on digital pin 2: LED should light up when current temp is lower than desired temp
+                string ledCommand = (huidigeTemp < gewensteTemp) ? "set d2 high" : "set d2 low";
+                try
+                {
+                    serialPortArduino.WriteLine(ledCommand);
+                }
+                catch (Exception)
+                {
+                    // Silently ignore errors when sending LED control command
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Error in timerOefening5_Tick: " + ex.Message);
             }
         }
     }
