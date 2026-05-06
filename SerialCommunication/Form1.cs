@@ -15,6 +15,7 @@ namespace SerialCommunication
     public partial class Form1 : Form
     {
         private SerialPort serialPortArduino;
+        private System.Windows.Forms.Timer timerOefening4;
 
         public Form1()
         {
@@ -24,6 +25,20 @@ namespace SerialCommunication
             serialPortArduino = new SerialPort();
             serialPortArduino.ReadTimeout = 1000;
             serialPortArduino.WriteTimeout = 1000;
+
+            // Timer for Oefening4 (interval 1000 ms)
+            timerOefening4 = new System.Windows.Forms.Timer();
+            timerOefening4.Interval = 1000; // 1000 ms
+            timerOefening4.Tick += timerOefening4_Tick;
+
+            // Wire tab selection to start/stop timer
+            tabControl.SelectedIndexChanged += tabControl_SelectedIndexChanged;
+
+            // If the tab is already selected at startup, start timer
+            if (tabControl.SelectedTab == tabPageOefening4)
+            {
+                timerOefening4.Start();
+            }
         }
 
         private void Form1_Load(object sender, EventArgs e)
@@ -311,6 +326,7 @@ namespace SerialCommunication
         {
             try
             {
+                // timer for Oefening3
                 if (tabControl.SelectedTab == tabPageOefening3)
                 {
                     timerOefening3.Enabled = true;
@@ -318,6 +334,16 @@ namespace SerialCommunication
                 else
                 {
                     timerOefening3.Enabled = false;
+                }
+
+                // timer for Oefening4
+                if (tabControl.SelectedTab == tabPageOefening4)
+                {
+                    timerOefening4?.Start();
+                }
+                else
+                {
+                    timerOefening4?.Stop();
                 }
             }
             catch (Exception ex)
@@ -381,6 +407,57 @@ namespace SerialCommunication
             catch (Exception ex)
             {
                 MessageBox.Show("Fout bij lezen van digitale ingangen: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+
+
+        private void timerOefening4_Tick(object sender, EventArgs e)
+        {
+            try
+            {
+                if (serialPortArduino == null || !serialPortArduino.IsOpen)
+                {
+                    return;
+                }
+
+                // Remove any previous incoming data
+                try { serialPortArduino.ReadExisting(); } catch { }
+
+                // Request analog0 value
+                serialPortArduino.WriteLine("get a0");
+
+                string resp = null;
+                try
+                {
+                    resp = serialPortArduino.ReadLine();
+                }
+                catch (TimeoutException) { resp = null; }
+                catch (Exception) { resp = null; }
+
+                if (string.IsNullOrEmpty(resp))
+                {
+                    return;
+                }
+
+                // Trim to the last token (likely the numeric value)
+                string value = resp.Trim();
+                var tokens = value.Split(new char[] { ' ', '\t', ':' }, StringSplitOptions.RemoveEmptyEntries);
+                if (tokens.Length > 0) value = tokens[tokens.Length - 1].Trim();
+
+                // Update UI thread-safely
+                if (labelAnalog0.InvokeRequired)
+                {
+                    labelAnalog0.BeginInvoke(new Action(() => labelAnalog0.Text = value));
+                }
+                else
+                {
+                    labelAnalog0.Text = value;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Error in timerOefening4_Tick: " + ex.Message);
             }
         }
     }
