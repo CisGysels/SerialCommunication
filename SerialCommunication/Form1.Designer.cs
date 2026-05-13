@@ -24,6 +24,11 @@
                     timerOefening4.Dispose();
                     timerOefening4 = null;
                 }
+                if (timerOefening5 != null)
+                {
+                    timerOefening5.Dispose();
+                    timerOefening5 = null;
+                }
             }
             base.Dispose(disposing);
         }
