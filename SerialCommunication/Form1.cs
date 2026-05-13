@@ -156,6 +156,10 @@ namespace SerialCommunication
                     try
                     {
                         serialPortArduino.Open();
+
+                        // Attach event handlers for unplug detection
+                        try { serialPortArduino.ErrorReceived += serialPortArduino_ErrorReceived; } catch { }
+                        try { serialPortArduino.PinChanged += serialPortArduino_PinChanged; } catch { }
                     }
                     catch (Exception openEx)
                     {
@@ -200,6 +204,9 @@ namespace SerialCommunication
                 {
                     try
                     {
+                        // Detach event handlers before closing
+                        try { serialPortArduino.ErrorReceived -= serialPortArduino_ErrorReceived; } catch { }
+                        try { serialPortArduino.PinChanged -= serialPortArduino_PinChanged; } catch { }
                         serialPortArduino.Close();
                     }
                     catch (Exception closeEx)
@@ -615,6 +622,8 @@ namespace SerialCommunication
                         {
                             MessageBox.Show("Apparaat lijkt losgekoppeld. De seriële poort is niet meer beschikbaar.", "Fout", MessageBoxButtons.OK, MessageBoxIcon.Error);
                             try { if (serialPortArduino.IsOpen) serialPortArduino.Close(); } catch { }
+                            try { serialPortArduino.ErrorReceived -= serialPortArduino_ErrorReceived; } catch { }
+                            try { serialPortArduino.PinChanged -= serialPortArduino_PinChanged; } catch { }
                             buttonConnect.Text = "Connect";
                             radioButtonVerbonden.Checked = false;
                             if (labelStatus != null) labelStatus.Text = "Disconnected";
@@ -643,6 +652,8 @@ namespace SerialCommunication
                         {
                             MessageBox.Show("Apparaat lijkt losgekoppeld of de poort is niet langer bereikbaar.", "Fout", MessageBoxButtons.OK, MessageBoxIcon.Error);
                             try { if (serialPortArduino.IsOpen) serialPortArduino.Close(); } catch { }
+                            try { serialPortArduino.ErrorReceived -= serialPortArduino_ErrorReceived; } catch { }
+                            try { serialPortArduino.PinChanged -= serialPortArduino_PinChanged; } catch { }
                             buttonConnect.Text = "Connect";
                             radioButtonVerbonden.Checked = false;
                             if (labelStatus != null) labelStatus.Text = "Disconnected";
@@ -658,6 +669,50 @@ namespace SerialCommunication
                 }
             }
             catch { }
+        }
+
+        private void serialPortArduino_ErrorReceived(object sender, SerialErrorReceivedEventArgs e)
+        {
+            Action handle = () =>
+            {
+                MessageBox.Show("Seriële fout gedetecteerd: " + e.EventType.ToString() + ". Verbinding verbroken.", "Fout", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                try { if (serialPortArduino != null && serialPortArduino.IsOpen) serialPortArduino.Close(); } catch { }
+                try { serialPortArduino.ErrorReceived -= serialPortArduino_ErrorReceived; } catch { }
+                try { serialPortArduino.PinChanged -= serialPortArduino_PinChanged; } catch { }
+                buttonConnect.Text = "Connect";
+                radioButtonVerbonden.Checked = false;
+                if (labelStatus != null) labelStatus.Text = "Disconnected";
+                timerOefening4?.Stop();
+                timerOefening5?.Stop();
+                timerPortMonitor?.Stop();
+                serialPortArduino = null;
+            };
+
+            if (this.InvokeRequired) this.BeginInvoke(handle); else handle();
+        }
+
+        private void serialPortArduino_PinChanged(object sender, SerialPinChangedEventArgs e)
+        {
+            // Some pin changes indicate DSR/CTS/CD loss — treat these as possible disconnects
+            if (e.EventType == SerialPinChange.CDChanged || e.EventType == SerialPinChange.DsrChanged || e.EventType == SerialPinChange.CtsChanged || e.EventType == SerialPinChange.Break)
+            {
+                Action handle = () =>
+                {
+                    MessageBox.Show("Seriële pin wijziging gedetecteerd: " + e.EventType.ToString() + ". Mogelijk apparaat losgekoppeld.", "Fout", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    try { if (serialPortArduino != null && serialPortArduino.IsOpen) serialPortArduino.Close(); } catch { }
+                    try { serialPortArduino.ErrorReceived -= serialPortArduino_ErrorReceived; } catch { }
+                    try { serialPortArduino.PinChanged -= serialPortArduino_PinChanged; } catch { }
+                    buttonConnect.Text = "Connect";
+                    radioButtonVerbonden.Checked = false;
+                    if (labelStatus != null) labelStatus.Text = "Disconnected";
+                    timerOefening4?.Stop();
+                    timerOefening5?.Stop();
+                    timerPortMonitor?.Stop();
+                    serialPortArduino = null;
+                };
+
+                if (this.InvokeRequired) this.BeginInvoke(handle); else handle();
+            }
         }
     }
 }
