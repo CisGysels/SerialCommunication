@@ -604,35 +604,56 @@ namespace SerialCommunication
         {
             try
             {
-                if (serialPortArduino != null && serialPortArduino.IsOpen)
+                var ports = SerialPort.GetPortNames();
+
+                if (serialPortArduino != null && !string.IsNullOrEmpty(serialPortArduino.PortName))
                 {
-                    var ports = SerialPort.GetPortNames();
+                    // If the named COM port disappeared from the system, treat as unplugged
                     if (!ports.Contains(serialPortArduino.PortName))
                     {
-                        // Device likely unplugged - notify user and cleanup
-                        if (this.InvokeRequired)
-                        {
-                            this.BeginInvoke(new Action(() =>
-                            {
-                                MessageBox.Show("Apparaat lijkt losgekoppeld. De seriële poort is niet meer beschikbaar.", "Fout", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                                try { serialPortArduino.Close(); } catch { }
-                                buttonConnect.Text = "Connect";
-                                radioButtonVerbonden.Checked = false;
-                                if (labelStatus != null) labelStatus.Text = "Disconnected";
-                                timerOefening4?.Stop();
-                                timerOefening5?.Stop();
-                            }));
-                        }
-                        else
+                        Action handleDisconnect = () =>
                         {
                             MessageBox.Show("Apparaat lijkt losgekoppeld. De seriële poort is niet meer beschikbaar.", "Fout", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                            try { serialPortArduino.Close(); } catch { }
+                            try { if (serialPortArduino.IsOpen) serialPortArduino.Close(); } catch { }
                             buttonConnect.Text = "Connect";
                             radioButtonVerbonden.Checked = false;
                             if (labelStatus != null) labelStatus.Text = "Disconnected";
                             timerOefening4?.Stop();
                             timerOefening5?.Stop();
-                        }
+                            timerPortMonitor?.Stop();
+                            serialPortArduino = null;
+                        };
+
+                        if (this.InvokeRequired) this.BeginInvoke(new Action(handleDisconnect)); else handleDisconnect();
+                        return;
+                    }
+                }
+
+                // Additionally try a light-weight operation on the open port that will throw if the underlying handle is gone
+                if (serialPortArduino != null && serialPortArduino.IsOpen)
+                {
+                    try
+                    {
+                        serialPortArduino.DiscardInBuffer();
+                        serialPortArduino.DiscardOutBuffer();
+                    }
+                    catch (Exception ex) when (ex is System.IO.IOException || ex is InvalidOperationException || ex is UnauthorizedAccessException)
+                    {
+                        Action handleDisconnect = () =>
+                        {
+                            MessageBox.Show("Apparaat lijkt losgekoppeld of de poort is niet langer bereikbaar.", "Fout", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            try { if (serialPortArduino.IsOpen) serialPortArduino.Close(); } catch { }
+                            buttonConnect.Text = "Connect";
+                            radioButtonVerbonden.Checked = false;
+                            if (labelStatus != null) labelStatus.Text = "Disconnected";
+                            timerOefening4?.Stop();
+                            timerOefening5?.Stop();
+                            timerPortMonitor?.Stop();
+                            serialPortArduino = null;
+                        };
+
+                        if (this.InvokeRequired) this.BeginInvoke(new Action(handleDisconnect)); else handleDisconnect();
+                        return;
                     }
                 }
             }
@@ -640,7 +661,4 @@ namespace SerialCommunication
         }
     }
 }
-            }
-        }
-    }
-}
+  
