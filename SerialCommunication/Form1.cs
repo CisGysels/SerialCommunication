@@ -17,6 +17,7 @@ namespace SerialCommunication
         private SerialPort serialPortArduino;
         private System.Windows.Forms.Timer timerOefening4;
         private System.Windows.Forms.Timer timerOefening5;
+        private System.Windows.Forms.Timer timerPortMonitor;
 
         public Form1()
         {
@@ -36,6 +37,12 @@ namespace SerialCommunication
             timerOefening5 = new System.Windows.Forms.Timer();
             timerOefening5.Interval = 1000; // 1000 ms
             timerOefening5.Tick += timerOefening5_Tick;
+
+            // Timer to monitor port presence (checks if selected COM port disappears)
+            timerPortMonitor = new System.Windows.Forms.Timer();
+            timerPortMonitor.Interval = 1000; // 1 second
+            timerPortMonitor.Tick += timerPortMonitor_Tick;
+            timerPortMonitor.Start();
 
             // Wire tab selection to start/stop timer
             tabControl.SelectedIndexChanged += tabControl_SelectedIndexChanged;
@@ -556,7 +563,7 @@ namespace SerialCommunication
 
                 // Update UI with temperature values (rounded to 1 decimal place)
                 string gewensteTempStr = gewensteTemp.ToString("F1") + " °C";
-                string huidige TempStr = huidigeTemp.ToString("F1") + " °C";
+                string huidigeTemTempStr = huidigeTemp.ToString("F1") + " °C";
 
                 if (labelGewensteTemp.InvokeRequired)
                 {
@@ -569,11 +576,11 @@ namespace SerialCommunication
 
                 if (labelHuidigeTemp.InvokeRequired)
                 {
-                    labelHuidigeTemp.BeginInvoke(new Action(() => labelHuidigeTemp.Text = huidge TempStr));
+                    labelHuidigeTemp.BeginInvoke(new Action(() => labelHuidigeTemp.Text = huidigeTemTempStr));
                 }
                 else
                 {
-                    labelHuidigeTemp.Text = huidigeTemp Str;
+                    labelHuidigeTemp.Text = huidigeTemTempStr;
                 }
 
                 // Control LED on digital pin 2: LED should light up when current temp is lower than desired temp
@@ -590,6 +597,49 @@ namespace SerialCommunication
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("Error in timerOefening5_Tick: " + ex.Message);
+            }
+        }
+
+        private void timerPortMonitor_Tick(object sender, EventArgs e)
+        {
+            try
+            {
+                if (serialPortArduino != null && serialPortArduino.IsOpen)
+                {
+                    var ports = SerialPort.GetPortNames();
+                    if (!ports.Contains(serialPortArduino.PortName))
+                    {
+                        // Device likely unplugged - notify user and cleanup
+                        if (this.InvokeRequired)
+                        {
+                            this.BeginInvoke(new Action(() =>
+                            {
+                                MessageBox.Show("Apparaat lijkt losgekoppeld. De seriële poort is niet meer beschikbaar.", "Fout", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                try { serialPortArduino.Close(); } catch { }
+                                buttonConnect.Text = "Connect";
+                                radioButtonVerbonden.Checked = false;
+                                if (labelStatus != null) labelStatus.Text = "Disconnected";
+                                timerOefening4?.Stop();
+                                timerOefening5?.Stop();
+                            }));
+                        }
+                        else
+                        {
+                            MessageBox.Show("Apparaat lijkt losgekoppeld. De seriële poort is niet meer beschikbaar.", "Fout", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            try { serialPortArduino.Close(); } catch { }
+                            buttonConnect.Text = "Connect";
+                            radioButtonVerbonden.Checked = false;
+                            if (labelStatus != null) labelStatus.Text = "Disconnected";
+                            timerOefening4?.Stop();
+                            timerOefening5?.Stop();
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+    }
+}
             }
         }
     }
